@@ -1,0 +1,51 @@
+[사용자]      한정판 구매 버튼 클릭
+   │
+   ▼
+[T1: /reserve 시작]
+  1) 멱등성(예약용 idem_key_reserve) 확인/선점
+     - 이미 같은 예약요청 처리했는지 확인, 없으면 "내가 처리"로 DB에 못박기
+
+  2) 재고 확인/차감(모델에 따라)
+     - (옵션) inventory_counter에서 available >= qty 조건부 UPDATE (ROW_COUNT=1이어야 성공)
+
+  3) HOLD 생성
+     - reservation_hold에 (hold_id, user_id, sku_id, qty, status='HOLD', expire_at) INSERT
+
+  4) 원장/아웃박스(예약생성)
+     - inventory_ledger(RESERVE_DEBIT) + event_outbox(ReservationCreated)
+
+  5) COMMIT → 응답: hold_id
+     - 이제 "내가 00분까지 찜했다"가 DB에 확정
+
+──────────────────────────────────────────────────────────────
+
+[PG]        결제 성공 (웹훅이 최소 한 번 이상, 중복 가능)
+   │
+   ▼
+[T2: /confirm 시작]
+  6) 멱등성(결제용 idem_key_pay) 확인/선점
+     - PG 거래ID 등으로 "이 결제건은 한 번만" 처리되게 DB에 못박기
+     - 이미 처리된 결제면 저장된 응답을 그대로 돌려주고 즉시 끝
+
+  7) HOLD 유효성 + 직렬화 (가장 중요!)
+     - SELECT ... FROM reservation_hold
+       WHERE hold_id=:hold AND user_id=:me AND status='HOLD' AND expire_at>NOW()
+       FOR UPDATE;   ← 같은 HOLD에 동시에 달려드는 요청을 ‘한 줄 서기’로 만들기
+     - 조건에 안 맞으면 즉시 롤백/종료(만료/이미확정/남의 HOLD)
+
+  8) 주문 생성
+     - orders, order_items INSERT
+     - (권장) orders에 UNIQUE(hold_id) 두어 "같은 HOLD로 주문 2개"를 DB가 절대 불가로 막기
+
+  9) HOLD 확정
+     - reservation_hold SET status='COMMITTED'
+     - (8)과 (9)는 같은 트랜잭션에서 원자적으로 처리 → 중간에 끊겨도 정합성 유지
+
+ 10) 원장/아웃박스(주문확정)
+     - order_ledger(ORDER_CONFIRMED) + event_outbox(OrderConfirmed)
+
+ 11) COMMIT → 응답: order_id
+     - 커밋이 끝났을 때만 주문번호를 돌려줘서 “보이면 존재” 원칙 보장
+
+ 12) 멱등 응답 스냅샷 저장
+     - idempotency.response_json에 결과 저장 → 이후 같은 결제 웹훅/재호출은 이걸 그대로 반환

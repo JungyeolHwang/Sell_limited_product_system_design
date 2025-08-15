@@ -1,0 +1,28 @@
+[클라이언트] ─ POST /reserve (sku, qty, Idempotency-Key)
+   ↓  (WAF/레이트리밋)
+[앱서버] ─── 트랜잭션 T1 시작
+   1) 멱등성 체크/등록  ← (③ 멱등성)
+   2) 1인 1개 제한 체크(활성 hold 중복 금지)
+   3) 재고 조건부 차감(available >= qty)  ← (① 초과주문 방지, ④ 락/동시성)
+   4) reservation_hold 생성(HOLD, TTL)   ← (② 예약/확정/만료)
+   5) inventory_ledger 기록(감사 원장)    ← (⑧ 관측/원장)
+   6) outbox 이벤트 기록(ReservationCreated) ← (선택: 아웃박스)
+   └ 커밋 T1 → 응답: hold_id, expire_at
+
+[클라이언트] ─ 결제 진행(외부 PG)
+   ↓  (웹훅 또는 클라 콜백)
+[앱서버] ─── 트랜잭션 T2 시작 (/confirm)
+   7) 멱등성 체크  ← (③)
+   8) hold 행 FOR UPDATE, 만료 여부/상태 확인 ← (②)
+   9) 주문/주문항목 생성, hold=COMMITTED
+  10) 원장/아웃박스 기록(OrderConfirmed)
+   └ 커밋 T2 → 응답: order_id
+
+[백그라운드] ─ 예약 만료 스캐너(주기)
+  11) 만료된 HOLD 배치 픽업 → 트랜잭션 T3
+  12) hold를 EXPIRED로 전이 + 재고 복원(available += qty) ← (②)
+  13) 원장/아웃박스 기록(ReservationExpired)
+   └ 커밋 T3
+
+[조회 경로] ─ 대시보드/상품페이지
+  14) 리플리카/캐시에서 읽기(CQRS) ← (⑤ 읽기/쓰기 분리)
