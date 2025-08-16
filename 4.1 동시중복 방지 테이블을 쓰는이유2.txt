@@ -1,0 +1,66 @@
+🎯 문제 상황: “1인 1개 예약만”
+
+우리 목표는 한 사람이 동시에 예약을 두 개 이상 잡지 못하게 하는 거예요.
+
+예: 홍길동이 스니커즈 1개를 예약(HOLD) → 그 상태에서 또다시 예약을 시도하면 거절해야 함.
+
+🏷️ 그냥 유니크 제약만 쓰면?
+
+reservation_hold 테이블에 이렇게 유니크를 걸었다고 해봅시다:
+
+UNIQUE(user_id, sale_id)
+
+
+그러면?
+
+홍길동이 예약(HOLD) 상태로 들어가면 user_id=1, sale_id=999 한 줄 생김 ✅
+
+나중에 만료(EXPIRED) 되면 새로운 예약을 다시 잡아야 하는데, 이미 같은 (user_id, sale_id) 값이 DB에 남아있어서 또 INSERT가 안 됨 ❌
+
+즉, 과거 기록(EXPIRED, COMMITTED) 때문에 새 예약을 못 잡는 문제가 생겨요.
+
+🏷️ 필요한 건 “조건부 유니크”
+
+“status='HOLD'일 때만 (user_id, sale_id) 유니크”
+→ 이러면:
+
+HOLD 상태는 유저당 1건만 가능
+
+COMMITTED/EXPIRED로 바뀐 행은 중복 허용 (과거 기록 남길 수 있음)
+
+👉 바로 이런 게 조건부 유니크(Partial Unique) 제약이에요.
+
+
+🏷️ 그런데 MySQL은 조건부 유니크를 지원 안 함
+
+PostgreSQL 같은 DB는 CREATE UNIQUE INDEX ... WHERE status='HOLD' 이렇게 만들 수 있어요.
+
+하지만 MySQL에는 그런 기능이 없음.
+
+그래서 “조건부 유니크”를 직접 걸 수가 없어요 😢
+
+
+
+🏷️ 그래서 user_active_hold 테이블을 따로 둔 것
+
+아이디어: “HOLD 상태만 따로 관리하는 깃발 테이블을 하나 두자!”
+
+CREATE TABLE user_active_hold (
+  sale_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  PRIMARY KEY (sale_id, user_id)
+);
+
+
+동작 방식:
+
+T1 예약 시작할 때 → user_active_hold에 (sale_id, user_id) INSERT
+
+이미 있으면 PK 충돌 → 즉시 실패 (이 유저는 이미 예약 중임)
+
+결제 성공/만료 처리할 때 → 해당 행을 DELETE (예약 끝났으니 깃발 제거)
+
+깃발이 없어지면 다시 예약 가능
+
+즉, user_active_hold는 **“현재 HOLD 상태인 예약만 모아둔 테이블”**이에요.
+그래서 “조건부 유니크” 대신 “별도 테이블 + PK 유니크”로 문제를 풀어낸 거예요.

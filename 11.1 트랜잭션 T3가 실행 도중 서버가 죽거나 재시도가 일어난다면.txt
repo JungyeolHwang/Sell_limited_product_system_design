@@ -1,0 +1,301 @@
+한 줄 규칙
+
+같은 HOLD(예약)에 대해 “만료 처리”는 딱 1번만 인정한다.
+두 번, 세 번 시도돼도 결과는 한 번 처리한 것과 똑같아야 한다 → 이걸 “멱등(idempotent)”이라고 해.
+
+편의점 비유
+
+고객이 물건을 장바구니에 담으면 = HOLD
+
+결제 성공하면 = COMMITTED
+
+결제 안 하고 떠나면 = EXPIRED(만료)
+
+문제: 점원(우리 배치)이 “장바구니 만료 정리”를 하다가 갑자기 정전(크래시) 나면, 다시 켰을 때 같은 장바구니를 또 정리할 수도 있음.
+그러면 “보관함에 물건 두 번 되돌림(재고 +2)” 같은 중복 반영이 생겨버림.
+
+그래서 뭘 하냐? (두 가지 안전장치)
+
+“이 장바구니 만료 처리했음” 도장 찍는 표를 둔다
+
+테이블로 치면 inventory_ledger 같은 원장(영수증) 테이블에
+('EXPIRE_CREDIT', hold_id) 조합이 유일(UNIQUE) 하도록 만든다.
+
+즉, 같은 HOLD에 같은 만료 이벤트는 딱 1행만 입력 가능.
+
+도장이 찍혔을 때만 재고/이벤트를 반영한다
+
+“원장 INSERT가 새로 성공했냐?”만 보고 결정
+
+새로 들어갔다(첫 처리) → 재고 +qty, 아웃박스 발행
+
+이미 있다(재시도/중복) → 아무것도 안 함
+
+10초 예시
+
+HOLD #777이 만료 대상, 수량 3
+
+첫 시도:
+
+원장 ('EXPIRE_CREDIT', 777) INSERT 성공 → 재고 +3, 이벤트 기록
+
+중간에 서버가 죽어서 같은 걸 또 집었을 때(재시도):
+
+원장 INSERT가 UNIQUE 충돌(이미 있음) → “아, 이건 예전에 처리했구나” 인지
+
+재고/이벤트 아무것도 안 함
+→ 여러 번 시도돼도 최종 결과는 재고 +3 딱 한 번.
+
+
+
+
+💡 기본 흐름 (만료 처리 순서)
+
+상태 변경
+reservation_hold → HOLD → EXPIRED
+
+원장 기록
+inventory_ledger에 EXPIRE_CREDIT 이벤트 INSERT (재고 복원 근거)
+
+재고 복원
+inventory_counter.available += qty
+
+아웃박스 기록
+외부 시스템에 알릴 ReservationExpired 이벤트 저장
+
+🛑 크래시가 날 수 있는 지점과 문제
+1️⃣ 상태만 바꾸고 서버가 죽음
+
+reservation_hold는 이미 EXPIRED로 변경됨
+
+근데 원장/재고 복원/아웃박스는 아직 안 함
+
+문제: 이 HOLD는 만료됐지만 재고는 여전히 묶여 있음 → “재고 유실”
+
+2️⃣ 원장까지 넣고 죽음
+
+상태 EXPIRED + 원장 EXPIRE_CREDIT까지 INSERT됨
+
+근데 재고 +qty, 아웃박스는 아직
+
+문제: 원장에는 복원했다고 쓰여있는데 실제 재고는 안 늘어남 → “재고·원장 불일치”
+
+3️⃣ 재고까지 늘리고 죽음
+
+상태 변경 + 원장 + 재고까지 OK
+
+근데 아웃박스는 미작성
+
+문제: 외부 시스템(배송/정산/알림)은 만료 사실을 모름 → “이벤트 유실”
+
+
+
+
+
+
+1. 만료 처리(T3) 기본 순서
+① HOLD 상태 → EXPIRED
+② 원장(ledger) EXPIRE_CREDIT 기록
+③ 재고(available) += qty
+④ 아웃박스(event_outbox) ReservationExpired 기록
+
+2. 크래시 시나리오
+🔴 케이스 A: ①에서 크래시
+상태만 EXPIRED, 나머지 X
+→ 재고는 여전히 줄어있음
+→ 원장도 없음
+
+
+재시도 시: 상태가 이미 EXPIRED라면 스킵될 수 있음 → 그래서 주기적 보정 배치에서 원장 없는 EXPIRED를 찾아 재처리.
+
+🔴 케이스 B: ②에서 크래시
+상태 EXPIRED, 원장은 있음, 재고/아웃박스 없음
+→ 원장에는 복원했다고 쓰여 있지만 실제 재고는 안 늘어남
+
+
+재시도 시: 원장 UNIQUE 제약에 걸려 재삽입 안 됨 → 그래서 재고는 “원장 합계 ↔ counter 값” 비교해서 보정.
+
+🔴 케이스 C: ③에서 크래시
+상태 EXPIRED, 원장 있음, 재고는 늘어남, 아웃박스 없음
+→ 외부 시스템은 만료 사실 모름
+
+
+재시도 시: 원장은 이미 있음 → 재고는 건너뜀, 아웃박스 UPSERT로 한 번만 발행.
+
+🔴 케이스 D: ④ 직후 커밋 전 크래시
+트랜잭션 롤백 → 아무것도 확정 안 됨
+
+
+재시도 시: 정상적으로 다시 처리됨.
+
+
+
+3. 안전장치 요약
+
+원장(ledger): (event_type, hold_id) UNIQUE → 재시도 시 중복 반영 방지
+
+아웃박스(event_outbox): (aggregate_type, aggregate_id, event_type) UNIQUE → 이벤트 중복 방지
+
+보정 배치: 원장 합계와 재고 카운터 비교, 불일치 자동 복구
+
+재시도: 이미 처리한 단계는 건너뛰고 누락된 단계만 수행
+
+
+
+
+
+
+기본 흐름(만료 처리 T3)
+
+┌──────────────┐   ┌────────────────────────────┐   ┌───────────────────────┐   ┌──────────────────────────────┐   ┌───────┐
+│ ① HOLD→EXPIRED │ → │ ② 원장 INSERT: EXPIRE_CREDIT │ → │ ③ 재고 복원: +qty        │ → │ ④ 아웃박스: ReservationExpired │ → │ COMMIT│
+└──────────────┘   └────────────────────────────┘   └───────────────────────┘   └──────────────────────────────┘   └───────┘
+     ▲ A(여기서 죽음)          ▲ B(여기서 죽음)                ▲ C(여기서 죽음)                  ▲ D(커밋 직전 죽음)
+
+
+크래시 지점별 “무슨 문제?” & “재시도 시 어떻게 끝내?”
+
+
+A) ①에서 크래시 — “상태만 EXPIRED로 바뀌고 멈춤”
+
+상태: EXPIRED
+원장: 없음
+재고: +qty 안 됨 (여전히 묶임)
+아웃박스: 없음
+
+문제: 재고가 계속 묶여 있어 “실재 재고”와 숫자가 어긋남.
+
+재시도(권장):
+
+만료 스캐너는 “EXPIRED 이면서 원장 없는 HOLD”도 주기적으로 집어 처리.
+
+② 원장 UPSERT(UNIQUE로 1회만) → ③ 재고 +qty → ④ 아웃박스 UPSERT.
+
+안전장치 포인트: 원장에 UNIQUE(event_type, hold_id)가 있어 같은 만료 이벤트는 1번만 기록됨.
+
+
+B) ②에서 크래시 — “원장까지는 기록, 재고/아웃박스 전 못 하고 멈춤”
+
+상태: EXPIRED
+원장: EXPIRE_CREDIT 있음(성공)
+재고: +qty 안 됨
+아웃박스: 없음
+
+
+문제: “원장에는 복원했다고 되어 있는데” 실제 재고는 안 늘어남.
+
+재시도(권장):
+
+② 원장 UPSERT → 이미 있으므로 중복 NOOP
+
+원장 ‘존재’를 근거로 ③ 재고 +qty 실행(1회) → ④ 아웃박스 UPSERT
+
+보정 배치(보험): 주기적으로 SUM(ledger.qty_delta)와 inventory_counter.available을 대조해 틀어지면 자동 보정.
+(운영 중 아주 드물게 생길 수 있는 경계 크래시도 결국 원장=진실로 수렴)
+
+
+C) ③에서 크래시 — “재고까지 복원했지만 아웃박스 전에서 멈춤”
+
+상태: EXPIRED
+원장: EXPIRE_CREDIT 있음
+재고: +qty 반영됨
+아웃박스: 없음
+
+
+문제: 외부 시스템(알림/정산/로그 등)이 만료 사실을 모름.
+
+재시도(권장):
+
+② 원장 UPSERT → 이미 있음 → NOOP
+
+③ 재고는 다시 +qty 하면 안 됨(중복) → 스킵
+
+④ 아웃박스 UPSERT(고유키/UPSERT로 1회만 기록)
+
+결과: 이벤트도 “딱 1번만” 나가서 외부 일관성 유지.
+
+
+
+D) ④ 직후 ~ COMMIT 전에 크래시 — “전부 롤백”
+
+상태/원장/재고/아웃박스: 모두 취소(확정 X)
+
+재시도: 처음부터 다시 정상 처리. (아무것도 확정된 게 없으니 중복 위험 없음)
+
+
+----------------------------------------------------------------------------
+
+# 참고
+
+좋은 질문! “원장까지 기록하고(= EXPIRE_CREDIT INSERT 성공) 재고 +qty 전에 크래시”가 났을 때, 중복 없이 재고를 복원하는 실전 패턴 2가지를 바로 쓸 수 있게 정리해줄게요.
+
+패턴 A: “적용 마커(applied) 테이블”로 1회만 반영
+
+가장 직관적이고 안전한 방법입니다. 원장 1행을 재고에 반영했는지를 별도 테이블에 “도장” 찍어 기억하고, 그 도장을 PK/UNIQUE로 걸어 중복을 막아요.
+
+DDL (예: MySQL)
+-- 원장: 이미 (event_type, hold_id) UNIQUE 로 "만료 이벤트 1회" 보장
+-- inventory_ledger(ledger_id PK, event_type, hold_id, qty_delta, ...)
+
+-- 재고 반영 여부 마커
+CREATE TABLE inventory_apply_marker (
+  ledger_id BIGINT PRIMARY KEY,   -- 이 원장행을 재고에 반영했는지
+  sku_id    BIGINT NOT NULL,
+  qty       INT    NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+재시도 트랜잭션(T3 재시도 시 공통)
+BEGIN;
+
+-- 1) 원장 존재(= EXPIRE_CREDIT) 확인 + 락(선택)
+SELECT ledger_id, sku_id, qty_delta
+  FROM inventory_ledger
+ WHERE event_type='EXPIRE_CREDIT' AND hold_id=:hold_id
+ FOR UPDATE;
+
+-- 2) 마커 INSERT 로 "이번이 첫 반영인지" 판단 (중복이면 PK 충돌)
+INSERT INTO inventory_apply_marker(ledger_id, sku_id, qty)
+VALUES (:ledger_id, :sku_id, :qty_delta)
+ON DUPLICATE KEY UPDATE ledger_id = ledger_id;  -- NOOP
+
+-- 3) 정말 이번이 '첫 반영'일 때만 재고 +qty
+IF ROW_COUNT() = 1 THEN
+  UPDATE inventory_counter
+     SET available = available + :qty_delta
+   WHERE sku_id = :sku_id;
+END IF;
+
+-- 4) 아웃박스도 UPSERT(중복 발행 방지)
+INSERT INTO event_outbox(aggregate_type, aggregate_id, event_type, payload)
+VALUES ('InventoryReservation', :hold_id, 'ReservationExpired', :payload)
+ON DUPLICATE KEY UPDATE event_id = event_id;
+
+COMMIT;
+
+
+중요 포인트
+
+첫 시도: 마커 INSERT 성공 → ROW_COUNT()=1 → 재고 +qty 1회 수행
+
+재시도(혹은 다중 인스턴스 동시 실행): 마커가 이미 있음 → ROW_COUNT()=0 → 재고 갱신 스킵
+
+이렇게 하면 “원장은 이미 있음 + 재고는 아직”인 상황도 정확히 1번만 메꿉니다.
+
+PostgreSQL이면 ON CONFLICT (ledger_id) DO NOTHING을 쓰고, GET DIAGNOSTICS rowcount = ROW_COUNT; 또는 RETURNING 여부로 첫 반영인지 판단하면 됩니다.
+
+패턴 B: “원장=진실”로 주기 보정(리컨실리에이션)
+
+운영 보험용 전략입니다. 주기적으로:
+
+SKU별 원장 합계(Σ qty_delta where event_type in {...}})
+vs
+inventory_counter.available
+
+
+를 비교해 차이만큼 보정 UPDATE 합니다.
+T3 재시도에서 놓친 극히 드문 모서리 케이스도 결국 원장에 맞게 수렴합니다.
+
+현실적으로는 패턴 A(즉시 멱등 반영) + 패턴 B(주기 보정) 를 함께 둡니다.
+A가 실시간 중복을 막고, B가 혹시 모를 경계 크래시를 자동 교정합니다.
+

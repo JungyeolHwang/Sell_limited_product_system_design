@@ -1,0 +1,27 @@
+① FOR UPDATE 없이 처리할 때
+시간 →
+서버 A: HOLD 조회 → 유효! → 주문 생성 → HOLD=COMMITTED → COMMIT
+서버 B: HOLD 조회 → 유효! → 주문 생성 → HOLD=COMMITTED → COMMIT
+결과: 주문 2개 생성, 재고 2번 차감 (중복 확정 발생)
+
+
+문제 원인: A와 B가 거의 동시에 읽어서 둘 다 유효하다고 착각함.
+
+② FOR UPDATE 사용할 때
+시간 →
+서버 A: HOLD 조회 + FOR UPDATE (행 락 획득)
+         ↓
+         주문 생성 → HOLD=COMMITTED → COMMIT → 락 해제
+서버 B: HOLD 조회 + FOR UPDATE (대기)
+         ↓ (A가 커밋 후)
+         HOLD 조회 → 이미 COMMITTED 상태 → 처리 중단
+결과: 주문 1개만 생성 (중복 확정 방지)
+
+
+핵심: 첫 번째 요청만 락을 잡고 진행,
+나머지는 끝날 때까지 대기했다가 “이미 확정됨”을 보고 스킵.
+
+즉, FOR UPDATE는
+
+"동시에 들어오는 요청을 직렬화해서 한 명씩만 확정하게 만드는 안전장치"
+역할을 합니다.

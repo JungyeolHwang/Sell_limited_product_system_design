@@ -75,6 +75,7 @@ CREATE TABLE event_outbox (
   created_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   sent_at         DATETIME    NULL,
   PRIMARY KEY (event_id),
+  UNIQUE KEY uq_aggregate_event (aggregate_type, aggregate_id, event_type),  -- 같은 aggregate에 같은 이벤트 1회만
   KEY             k_status_time (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
