@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한정판 상품 주문 처리 시스템</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .overview {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .process-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        
+        .flow-step {
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            flex: 1;
+            margin: 10px;
+            min-width: 250px;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .flow-step:hover {
+            transform: translateY(-5px);
+        }
+        
+        .flow-step.t1 { background: linear-gradient(45deg, #FF6B6B, #ee5a52); }
+        .flow-step.t2 { background: linear-gradient(45deg, #4ECDC4, #44d4c8); }
+        .flow-step.t3 { background: linear-gradient(45deg, #45B7D1, #4295c4); }
+        
+        .flow-step h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .flow-step::after {
+            content: "→";
+            position: absolute;
+            right: -25px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: #666;
+        }
+        
+        .flow-step:last-child::after {
+            display: none;
+        }
+        
+        .transaction-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border-left: 6px solid;
+        }
+        
+        .transaction-card.t1 { border-left-color: #FF6B6B; }
+        .transaction-card.t2 { border-left-color: #4ECDC4; }
+        .transaction-card.t3 { border-left-color: #45B7D1; }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        
+        .card-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            margin-right: 20px;
+        }
+        
+        .t1 .card-icon { background: #FF6B6B; }
+        .t2 .card-icon { background: #4ECDC4; }
+        .t3 .card-icon { background: #45B7D1; }
+        
+        .card-title {
+            flex: 1;
+        }
+        
+        .card-title h2 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        
+        .goal {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .scenario {
+            background: #fff3cd;
+            border: 1px solid #ffecb5;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .steps {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .step {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .step:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .step-number {
+            background: #007bff;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        
+        .step-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .what-section {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .why-section {
+            background: #fff3e0;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .how-section {
+            background: #e8f5e8;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .analogy-section {
+            background: #fce4ec;
+            padding: 12px;
+            border-radius: 8px;
+            font-style: italic;
+        }
+        
+        .section-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            tab-size: 2;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .code-block .comment {
+            color: #68d391;
+            font-style: italic;
+        }
+        
+        .code-block .keyword {
+            color: #63b3ed;
+            font-weight: bold;
+        }
+        
+        .code-block .string {
+            color: #fbb6ce;
+        }
+        
+        .code-block .number {
+            color: #f6ad55;
+        }
+        
+        .highlight {
+            background: #ffeb3b;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffecb5;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .summary-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 768px) {
+            .process-flow {
+                flex-direction: column;
+            }
+            
+            .flow-step::after {
+                content: "↓";
+                right: 50%;
+                top: auto;
+                bottom: -25px;
+                transform: translateX(50%);
+            }
+            
+            .flow-step:last-child::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛒 한정판 상품 주문 처리 시스템</h1>
+            <div class="subtitle">3단계 트랜잭션으로 안전하고 확장 가능한 동시 주문 처리</div>
+        </div>
+
+        <div class="overview">
+            <h2>🎯 시스템 개요</h2>
+            <p>한정판 스니커즈 100켤레를 온라인으로 판매할 때, 수만 명이 동시에 구매 버튼을 누르는 상황을 안전하게 처리하는 시스템입니다.</p>
+            
+            <div class="process-flow">
+                <div class="flow-step t1">
+                    <h3>🛒 T1: 예약하기</h3>
+                    <p>5분간 찜하기</p>
+                </div>
+                <div class="flow-step t2">
+                    <h3>💳 T2: 결제하기</h3>
+                    <p>진짜 구매</p>
+                </div>
+                <div class="flow-step t3">
+                    <h3>🧹 T3: 정리하기</h3>
+                    <p>안 산 것 치우기</p>
+                </div>
+            </div>
+
+            <div class="success">
+                <strong>🎯 핵심 해결 과제:</strong>
+                <ul style="margin-top: 10px;">
+                    <li><strong>동시성 문제:</strong> 수천 명이 동시에 같은 상품 주문 시 레이스 컨디션 방지</li>
+                    <li><strong>재고 정확성:</strong> 절대로 음수 재고나 초과주문 발생 방지</li>
+                    <li><strong>멱등성:</strong> 네트워크 재시도, 더블클릭, PG 웹훅 중복 처리 방지</li>
+                    <li><strong>성능과 복구:</strong> DB 핫스팟 최소화와 서버 크래시 시 데이터 일관성 유지</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 핵심 테이블 구조 -->
+        <div class="overview">
+            <h2>🗃️ 핵심 테이블 구조</h2>
+            <p>한정판 상품 주문 처리를 위한 6개 핵심 테이블로 구성됩니다.</p>
+
+            <div class="steps">
+                <div class="step" style="border-left-color: #FF6B6B;">
+                    <div class="step-header">
+                        <div class="step-number" style="background: #FF6B6B;">1</div>
+                        <div class="step-title">멱등성 테이블 (idempotency)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">🎯 역할</div>
+                        <p>같은 요청(사용자, 키)을 한 번만 처리하도록 보장</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">🔑 핵심 필드</div>
+                        <div class="code-block">CREATE TABLE idempotency (
+  user_id       BIGINT       NOT NULL,
+  idem_key      CHAR(36)     NOT NULL,         -- 클라이언트가 준 UUID 등
+  request_hash  BINARY(32)   NOT NULL,         -- method+path+body 해시(SHA-256)
+  status        ENUM('IN_PROGRESS','SUCCEEDED','FAILED') NOT NULL,
+  response_json JSON         NULL,             -- 성공 시 응답 스냅샷
+  created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_key (user_id, idem_key)
+) ENGINE=InnoDB;</div>
+                    </div>
+                </div>
+
+                <div class="step" style="border-left-color: #4ECDC4;">
+                    <div class="step-header">
+                        <div class="step-number" style="background: #4ECDC4;">2</div>
+                        <div class="step-title">동시중복 방지 테이블 (user_active_hold)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">🎯 역할</div>
+                        <p>1인 동시중복 예약 방지를 위한 가벼운 깃발 테이블</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">🔑 핵심 필드</div>
+                        <div class="code-block">CREATE TABLE user_active_hold (
+  sale_id    BIGINT     NOT NULL,
+  user_id    BIGINT     NOT NULL,
+  sku_id     BIGINT     NOT NULL,
+  hold_id    BIGINT     NULL,      -- 예약 생성 후 연결
+  expire_at  DATETIME   NULL,
+  PRIMARY KEY (sale_id, user_id)
+) ENGINE=InnoDB;</div>
+                    </div>
+                </div>
+
+                <div class="step" style="border-left-color: #45B7D1;">
+                    <div class="step-header">
+                        <div class="step-number" style="background: #45B7D1;">3</div>
+                        <div class="step-title">재고 카운터 테이블 (inventory_counter)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">🎯 역할</div>
+                        <p>현재 가용 재고 - 조건부 단일 UPDATE 대상 (전광판)</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">🔑 핵심 필드</div>
+                        <div class="code-block">CREATE TABLE inventory_counter (
+  sku_id     BIGINT   NOT NULL,
+  available  INT      NOT NULL CHECK (available >= 0),
+  PRIMARY KEY (sku_id)
+) ENGINE=InnoDB;</div>
+                    </div>
+                </div>
+
+                <div class="step" style="border-left-color: #FFA726;">
+                    <div class="step-header">
+                        <div class="step-number" style="background: #FFA726;">4</div>
+                        <div class="step-title">예약 테이블 (reservation_hold)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">🎯 역할</div>
+                        <p>결제 전 임시 점유 + TTL 관리</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">🔑 핵심 필드</div>
+                        <div class="code-block">CREATE TABLE reservation_hold (
+  hold_id     BIGINT   NOT NULL,
+  sale_id     BIGINT   NOT NULL,
+  sku_id      BIGINT   NOT NULL,
+  user_id     BIGINT   NOT NULL,
+  qty         INT      NOT NULL,
+  status      ENUM('HOLD','COMMITTED','EXPIRED','CANCELLED') NOT NULL,
+  expire_at   DATETIME NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (hold_id),
+  KEY k_expire_at (expire_at)
+) ENGINE=InnoDB;</div>
+                    </div>
+                </div>
+
+                <div class="step" style="border-left-color: #AB47BC;">
+                    <div class="step-header">
+                        <div class="step-number" style="background: #AB47BC;">5</div>
+                        <div class="step-title">재고 원장 테이블 (inventory_ledger)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">🎯 역할</div>
+                        <p>재고 변화 히스토리 - 불변 원장 (INSERT 전용)</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">🔑 핵심 필드</div>
+                        <div class="code-block">CREATE TABLE inventory_ledger (
+  ledger_id    BIGINT    NOT NULL AUTO_INCREMENT,
+  sku_id       BIGINT    NOT NULL,
+  event_type   ENUM('RESERVE_DEBIT','EXPIRE_CREDIT','CANCEL_CREDIT','ADJUSTMENT') NOT NULL,
+  qty_delta    INT       NOT NULL,     -- 차감은 음수(-), 복원은 양수(+)
+  hold_id      BIGINT    NULL,
+  reason       VARCHAR(100) NOT NULL,  -- 'reserve','expire','cancel' 등
+  actor        VARCHAR(50)  NOT NULL,  -- 'system','admin:uid=...' 등
+  created_at   DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (ledger_id),
+  UNIQUE KEY uq_reserve_once (event_type, hold_id)  -- 같은 hold에 같은 타입 1회만
+) ENGINE=InnoDB;</div>
+                    </div>
+                </div>
+
+                <div class="step" style="border-left-color: #66BB6A;">
+                    <div class="step-header">
+                        <div class="step-number" style="background: #66BB6A;">6</div>
+                        <div class="step-title">이벤트 아웃박스 테이블 (event_outbox)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">🎯 역할</div>
+                        <p>외부 전파용 이벤트 대기열 (커밋과 원자적으로 기록)</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">🔑 핵심 필드</div>
+                        <div class="code-block">CREATE TABLE event_outbox (
+  event_id        BIGINT      NOT NULL AUTO_INCREMENT,
+  aggregate_type  VARCHAR(50) NOT NULL,   -- e.g. 'InventoryReservation'
+  aggregate_id    BIGINT      NOT NULL,   -- e.g. hold_id
+  event_type      VARCHAR(50) NOT NULL,   -- e.g. 'ReservationCreated'
+  payload         JSON        NOT NULL,   -- 전송할 내용(필수 필드만)
+  status          ENUM('PENDING','IN_PROGRESS','SENT','FAILED') NOT NULL DEFAULT 'PENDING',
+  created_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (event_id),
+  UNIQUE KEY uq_aggregate_event (aggregate_type, aggregate_id, event_type)
+) ENGINE=InnoDB;</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning">
+                <h3>🔗 테이블 간 관계</h3>
+                <ul>
+                    <li><strong>전광판 & 영수증:</strong> inventory_counter와 inventory_ledger가 같은 트랜잭션에서 함께 움직임</li>
+                    <li><strong>예약 생명주기:</strong> user_active_hold → reservation_hold → orders (확정 시)</li>
+                    <li><strong>멱등성 보장:</strong> 모든 요청이 idempotency 테이블을 거쳐 중복 방지</li>
+                    <li><strong>이벤트 전파:</strong> 모든 상태 변화가 event_outbox를 통해 외부 시스템에 알림</li>
+                </ul>
+            </div>
+
+        <!-- T1 트랜잭션 -->
+        <div class="transaction-card t1">
+            <div class="card-header">
+                <div class="card-icon">🛒</div>
+                <div class="card-title">
+                    <h2>T1 트랜잭션: 예약하기</h2>
+                    <p>사용자가 "구매" 버튼을 눌렀을 때 재고를 안전하게 예약</p>
+                </div>
+            </div>
+
+            <div class="goal">
+                <div class="section-label">🎯 목표</div>
+                <p>사용자가 "구매" 버튼을 눌렀을 때, 재고를 안전하게 예약하기</p>
+            </div>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <div class="step-title">중복 요청 방지 (멱등성 체크)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>같은 사람이 구매 버튼을 여러 번 눌러도 한 번만 처리되게 합니다</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 필요한가요?</div>
+                        <p>• 사용자가 답답해서 구매 버튼을 연타할 수 있어요<br>
+                        • 네트워크 문제로 요청이 여러 번 갈 수 있어요</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- "이 요청은 내가 처리 중이야" 깃발 꽂기
+INSERT INTO idempotency(user_id, idem_key, status) 
+VALUES ('홍길동', 'abc-123', 'IN_PROGRESS')
+ON DUPLICATE KEY UPDATE idem_key = idem_key;
+
+-- 새로 들어갔나 확인
+IF ROW_COUNT() = 1 THEN
+  -- 내가 첫 번째 요청: 계속 진행
+ELSE 
+  -- 이미 처리 중: 기존 결과 반환하고 종료
+END IF;</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>은행에서 번호표 뽑기. 같은 번호표는 한 번만 뽑을 수 있어요.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <div class="step-title">한 사람당 1개 제한 체크</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>같은 사람이 여러 개 구매하는 것을 방지합니다</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 필요한가요?</div>
+                        <p>• 한정판은 보통 "1인 1개" 제한이 있어요<br>
+                        • 한 사람이 여러 브라우저로 동시에 주문할 수 있어요</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 이미 예약한 게 있는지 확인
+INSERT INTO user_active_hold(sale_id, user_id, sku_id) 
+VALUES (세일ID, '홍길동', '스니커즈ID')
+ON DUPLICATE KEY UPDATE sale_id = sale_id;
+
+IF ROW_COUNT() = 0 THEN
+  -- 이미 예약했음: 거절
+  ROLLBACK;
+END IF;</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>콘서트 티켓 예매할 때 "1인 4매 한정" 체크하는 것과 같아요.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <div class="step-title">재고 차감 (⭐ 가장 중요!)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>전체 재고에서 주문 수량만큼 빼기</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 중요한가요?</div>
+                        <p>• 여기서 실수하면 101개가 팔릴 수 있어요!<br>
+                        • 동시에 1000명이 마지막 1개를 노릴 때도 안전해야 해요</p>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>❌ 잘못된 방법 (절대 이렇게 하면 안 됨!):</strong>
+                        <div class="code-block">-- 위험한 방식
+SELECT available FROM inventory WHERE sku_id = 123;  -- 100개 확인
+-- 잠깐의 틈...
+UPDATE inventory SET available = available - 1;      -- 차감</div>
+                        → 두 명이 동시에 하면 둘 다 100개를 보고 둘 다 차감해서 98개가 됨!
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요? (✅ 올바른 방법)</div>
+                        <div class="code-block">-- 안전한 방식 (한 번에 확인+차감)
+UPDATE inventory_counter 
+SET available = available - 1 
+WHERE sku_id = 123 AND available >= 1;
+
+-- 실제로 차감됐는지 확인
+IF ROW_COUNT() = 1 THEN
+  -- 성공: 재고 1개 차감됨
+ELSE 
+  -- 실패: 재고 부족, 주문 거절
+  ROLLBACK;
+END IF;</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p><strong>❌ 나쁜 예:</strong> 냉장고 확인 → 우유 있네 → 마트 가서 우유 사기 (그 사이 가족이 우유 다 마실 수 있음)<br>
+                        <strong>✅ 좋은 예:</strong> 냉장고에서 우유를 직접 꺼내기 (없으면 꺼낼 수 없음)</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">4</div>
+                        <div class="step-title">예약 기록 생성</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>"홍길동님이 스니커즈 1켤레를 5분간 예약했음" 기록하기</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 필요한가요?</div>
+                        <p>• 결제할 때 "내가 진짜 예약한 게 맞나?" 확인하려고<br>
+                        • 5분 후에 자동으로 취소하려고</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">INSERT INTO reservation_hold(
+  hold_id, user_id, sku_id, qty, status, expire_at
+) VALUES (
+  'hold_12345', '홍길동', '스니커즈ID', 1, 'HOLD', 
+  NOW() + INTERVAL 5 MINUTE
+);</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>레스토랑에서 테이블 예약할 때 "홍길동님, 4인석, 7시, 10분 후 취소" 이렇게 적는 것</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">5</div>
+                        <div class="step-title">감사 기록 (영수증)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>"언제, 누가, 무엇을, 왜" 재고가 변했는지 영구 기록</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 필요한가요?</div>
+                        <p>• 나중에 문제 생겼을 때 추적하려고<br>
+                        • 재고 숫자가 안 맞을 때 원인 찾으려고</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">INSERT INTO inventory_ledger(
+  sku_id, event_type, qty_delta, hold_id, reason, created_at
+) VALUES (
+  '스니커즈ID', 'RESERVE_DEBIT', -1, 'hold_12345', 
+  '예약으로 인한 차감', NOW()
+);</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>가계부에 "2024-01-15, 스니커즈 예약, -1개, 홍길동" 이렇게 적어두는 것</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">6</div>
+                        <div class="step-title">이벤트 발송 준비 (아웃박스)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>다른 시스템들에게 "예약 발생했어요!" 알림 준비</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 필요한가요?</div>
+                        <p>• 재고 관리 시스템에 알려야 해요<br>
+                        • 마케팅 시스템에서 "남은 재고 99개" 업데이트해야 해요</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">INSERT INTO event_outbox(
+  event_type, payload, created_at
+) VALUES (
+  'ReservationCreated', 
+  '{"user_id":"홍길동", "sku_id":"스니커즈ID", "qty":1}',
+  NOW()
+);</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>우체통에 편지 넣어두기. 우체부(이벤트 발송 서비스)가 나중에 배달해줌</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="success">
+                <strong>🎯 T1 전체 흐름 정리:</strong><br>
+                이 6단계가 <span class="highlight">모두 성공하거나 모두 실패</span>합니다. 중간에 하나라도 실패하면 전부 취소돼요!
+                <div class="code-block">START TRANSACTION;  -- 트랜잭션 시작
+
+-- 1) 중복 방지 → 2) 1인 1개 체크 → 3) 재고 차감 (핵심!)
+-- 4) 예약 생성 → 5) 감사 기록 → 6) 이벤트 준비
+
+COMMIT;  -- 모든 것을 한 번에 확정
+
+RETURN { 
+  "hold_id": "hold_12345", 
+  "expire_at": "2024-01-15 14:05:00" 
+};</div>
+            </div>
+        </div>
+
+        <!-- T2 트랜잭션 -->
+        <div class="transaction-card t2">
+            <div class="card-header">
+                <div class="card-icon">💳</div>
+                <div class="card-title">
+                    <h2>T2 트랜잭션: 결제하기</h2>
+                    <p>결제가 완료되면 예약을 진짜 주문으로 바꾸기</p>
+                </div>
+            </div>
+
+            <div class="goal">
+                <div class="section-label">🎯 목표</div>
+                <p>결제가 완료되면 예약을 진짜 주문으로 바꾸기</p>
+            </div>
+
+            <div class="scenario">
+                <strong>🎬 시나리오:</strong><br>
+                1. 사용자가 T1으로 스니커즈를 예약함<br>
+                2. 결제 페이지에서 카드 정보 입력<br>
+                3. 외부 결제사(PG)에서 결제 성공<br>
+                4. 결제사가 우리 서버에 "결제 됐어요!" 알림 (웹훅)<br>
+                5. <strong>T2 트랜잭션 시작!</strong>
+            </div>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <div class="step-title">결제 중복 방지 (멱등성 체크)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>같은 결제 건이 여러 번 들어와도 한 번만 처리</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 필요한가요?</div>
+                        <p>• 결제사에서 웹훅을 여러 번 보낼 수 있어요<br>
+                        • 네트워크 문제로 재시도가 일어날 수 있어요</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 이미 처리한 결제인지 확인
+SELECT response_json 
+FROM idempotency 
+WHERE user_id = '홍길동' AND idem_key = 'payment_abc123';
+
+IF FOUND THEN
+  -- 이미 처리됨: 기존 결과 반환하고 종료
+  RETURN stored_response;
+END IF;
+
+-- 새로운 결제: "처리 중" 표시
+INSERT INTO idempotency(user_id, idem_key, status) 
+VALUES ('홍길동', 'payment_abc123', 'IN_PROGRESS');</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>은행에서 같은 수표를 두 번 현금화하려고 해도 한 번만 됨</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <div class="step-title">예약 유효성 확인 + 잠금 (⭐ 가장 중요!)</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>• 내가 예약한 게 아직 살아있는지 확인<br>
+                        • 다른 사람이 동시에 건드리지 못하게 잠금</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 이 단계가 중요한가요?</div>
+                        <p>• 예약이 만료됐을 수도 있어요 (5분 지남)<br>
+                        • 같은 예약에 대해 여러 결제가 동시에 올 수도 있어요</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 예약 정보를 락 걸고 가져오기
+SELECT user_id, sku_id, qty, status, expire_at
+FROM reservation_hold 
+WHERE hold_id = 'hold_12345' 
+FOR UPDATE;  -- 🔒 다른 트랜잭션이 이 행을 못 건드리게 락!
+
+-- 유효성 검사
+IF status != 'HOLD' THEN
+  ROLLBACK; -- 이미 확정되거나 만료됨
+END IF;
+
+IF expire_at <= NOW() THEN
+  ROLLBACK; -- 시간 만료
+END IF;
+
+IF user_id != '홍길동' THEN
+  ROLLBACK; -- 다른 사람 예약
+END IF;</div>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>FOR UPDATE가 중요한 이유:</strong>
+                        <div class="code-block">시간 순서:
+서버 A: 예약 확인 (HOLD 상태) → 주문 생성 → 상태 변경 → 커밋
+서버 B: 예약 확인 (대기...) → A 커밋 후 → 이미 COMMITTED 확인 → 중단
+
+FOR UPDATE 없으면:
+서버 A: 예약 확인 (HOLD 상태) → 주문 생성 → 상태 변경 → 커밋  
+서버 B: 예약 확인 (HOLD 상태) → 주문 생성 → 상태 변경 → 커밋
+결과: 주문 2개 생성! 💥</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>도서관에서 책 대출할 때, 사서가 책을 들고 있는 동안 다른 사람이 못 가져가는 것</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <div class="step-title">주문 생성</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>진짜 주문 레코드 만들기</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 주문 번호 생성
+SET @order_id = generate_order_id();
+
+-- 주문 생성
+INSERT INTO orders(
+  order_id, user_id, status, total_amount, hold_id, created_at
+) VALUES (
+  @order_id, '홍길동', 'CONFIRMED', 150000, 'hold_12345', NOW()
+);
+
+-- 주문 상품 정보
+INSERT INTO order_items(
+  order_id, sku_id, qty, price
+) VALUES (
+  @order_id, '스니커즈ID', 1, 150000
+);</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>레스토랑에서 주문표 작성하는 것</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">4</div>
+                        <div class="step-title">예약 확정</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>예약 상태를 'HOLD'에서 'COMMITTED'로 변경</p>
+                    </div>
+                    
+                    <div class="why-section">
+                        <div class="section-label">❓ 왜 3단계와 4단계를 같이 해야 하나요?</div>
+                        <p>• 주문은 생성됐는데 예약은 HOLD 상태로 남으면 안 되거든요<br>
+                        • 둘 다 성공하거나 둘 다 실패해야 해요</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 예약 확정
+UPDATE reservation_hold 
+SET status = 'COMMITTED', updated_at = NOW()
+WHERE hold_id = 'hold_12345' AND status = 'HOLD';
+
+-- 1인 1개 제한 해제 (더 이상 예약 중이 아니므로)
+DELETE FROM user_active_hold 
+WHERE user_id = '홍길동' AND hold_id = 'hold_12345';</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>도서관에서 예약 도서를 대출로 바꾸는 것</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">5</div>
+                        <div class="step-title">기록 및 이벤트</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>• 주문 확정 기록 남기기<br>
+                        • 다른 시스템들에게 알림 준비</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 주문 원장 기록
+INSERT INTO order_ledger(
+  order_id, event_type, payload, created_at
+) VALUES (
+  @order_id, 'ORDER_CONFIRMED', 
+  '{"hold_id":"hold_12345", "amount":150000}', NOW()
+);
+
+-- 배송/정산 시스템에 알림 준비
+INSERT INTO event_outbox(
+  event_type, payload, created_at
+) VALUES (
+  'OrderConfirmed',
+  '{"order_id":"order_67890", "user_id":"홍길동", "amount":150000}',
+  NOW()
+);</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p><strong>주문 원장</strong> = 가게 장부에 "홍길동님 스니커즈 판매" 기록<br>
+                        <strong>이벤트</strong> = 배송팀에게 "홍길동님 주소로 스니커즈 보내세요" 메모</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="success">
+                <strong>🎯 T2 전체 흐름 정리:</strong><br>
+                모든 단계가 성공해야만 order_id를 응답합니다. <span class="highlight">FOR UPDATE로 동시 확정을 방지</span>하는 것이 핵심!
+                <div class="code-block">START TRANSACTION;
+
+-- 1) 결제 중복 체크 → 2) 예약 유효성 + 잠금 (FOR UPDATE)
+-- 3) 주문 생성 → 4) 예약 확정 → 5) 기록 및 이벤트
+
+COMMIT;
+
+RETURN { 
+  "order_id": "order_67890", 
+  "status": "CONFIRMED" 
+};</div>
+            </div>
+        </div>
+
+        <!-- T3 트랜잭션 -->
+        <div class="transaction-card t3">
+            <div class="card-header">
+                <div class="card-icon">🧹</div>
+                <div class="card-title">
+                    <h2>T3 트랜잭션: 정리하기</h2>
+                    <p>시간이 지나도 결제하지 않은 예약들을 정리하고 재고 복원하기</p>
+                </div>
+            </div>
+
+            <div class="goal">
+                <div class="section-label">🎯 목표</div>
+                <p>시간이 지나도 결제하지 않은 예약들을 정리하고 재고 복원하기</p>
+            </div>
+
+            <div class="scenario">
+                <strong>🎬 시나리오:</strong><br>
+                1. 홍길동님이 오후 2시에 스니커즈를 예약함 (5분 유효)<br>
+                2. 오후 2시 5분이 지나도 결제 안 함<br>
+                3. <strong>T3 트랜잭션이 이 예약을 정리해야 함</strong><br>
+                4. 재고를 다시 99 → 100으로 복원<br>
+                5. 다른 사람이 구매할 수 있게 됨
+            </div>
+
+            <div class="success">
+                <strong>🤖 누가 실행하나요?</strong><br>
+                • <strong>백그라운드 배치 프로세스</strong>가 주기적으로 실행 (예: 10초마다)<br>
+                • 사용자가 직접 하는 게 아니라 시스템이 자동으로 함
+            </div>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <div class="step-title">만료된 예약 찾기</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>시간이 지났는데 아직 HOLD 상태인 예약들 찾기</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 만료된 예약들 찾기 (충돌 방지!)
+SELECT hold_id, sku_id, user_id, qty 
+FROM reservation_hold 
+WHERE status = 'HOLD' 
+  AND expire_at <= NOW()  -- 만료 시간 지남
+FOR UPDATE SKIP LOCKED    -- 🔒 T2가 처리 중인 건은 건너뛰기
+LIMIT 1000;               -- 한 번에 너무 많이 처리하지 않기</div>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>SKIP LOCKED가 중요한 이유:</strong>
+                        <div class="code-block">상황: hold_12345가 만료 시간이 지났지만, T2가 처리 중
+
+T2 (결제 처리):  hold_12345에 FOR UPDATE 락 걸고 처리 중...
+T3 (만료 처리):  SKIP LOCKED로 hold_12345는 건너뛰고 다른 것 처리
+
+만약 SKIP LOCKED가 없다면:
+T3이 T2가 끝날 때까지 대기 → 성능 저하</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>도서관에서 반납 연체 도서를 정리할 때, 누군가 읽고 있는 책은 건너뛰는 것</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <div class="step-title">상태 변경</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>찾은 예약들의 상태를 'HOLD' → 'EXPIRED'로 변경</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 찾은 예약들을 만료 상태로 변경
+UPDATE reservation_hold 
+SET status = 'EXPIRED', updated_at = NOW()
+WHERE hold_id IN ('hold_12345', 'hold_12346', ...)
+  AND status = 'HOLD';  -- 혹시 몰라 상태 한 번 더 확인</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>예약표에 "취소됨" 도장 찍기</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <div class="step-title">재고 복원</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>예약으로 묶여있던 재고를 다시 판매 가능 상태로 돌려놓기</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- SKU별로 복원할 수량 계산
+SELECT sku_id, SUM(qty) as total_qty
+FROM reservation_hold 
+WHERE hold_id IN ('hold_12345', 'hold_12346', ...)
+GROUP BY sku_id;
+
+-- 재고 복원
+UPDATE inventory_counter 
+SET available = available + 1  -- 1개 복원
+WHERE sku_id = '스니커즈ID';
+
+UPDATE inventory_counter 
+SET available = available + 2  -- 2개 복원  
+WHERE sku_id = '운동화ID';</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p>예약 취소된 상품을 다시 진열대에 올려놓기</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">4</div>
+                        <div class="step-title">기록 및 이벤트</div>
+                    </div>
+                    
+                    <div class="what-section">
+                        <div class="section-label">📝 무엇을 하나요?</div>
+                        <p>• 만료 처리한 것을 영구 기록<br>
+                        • 다른 시스템들에게 "재고 늘어났어요!" 알림</p>
+                    </div>
+                    
+                    <div class="how-section">
+                        <div class="section-label">⚙️ 어떻게 하나요?</div>
+                        <div class="code-block">-- 감사 기록 (각 만료 건별로)
+INSERT INTO inventory_ledger(
+  sku_id, event_type, qty_delta, hold_id, reason, created_at
+) VALUES
+  ('스니커즈ID', 'EXPIRE_CREDIT', +1, 'hold_12345', 
+   '만료로 인한 복원', NOW()),
+  ('운동화ID', 'EXPIRE_CREDIT', +2, 'hold_12346', 
+   '만료로 인한 복원', NOW());
+
+-- 이벤트 발송 준비
+INSERT INTO event_outbox(
+  event_type, payload, created_at
+) VALUES
+  ('ReservationExpired', 
+   '{"hold_id":"hold_12345", "sku_id":"스니커즈ID"}', NOW()),
+  ('ReservationExpired', 
+   '{"hold_id":"hold_12346", "sku_id":"운동화ID"}', NOW());
+
+-- 1인 1개 제한 해제
+DELETE FROM user_active_hold 
+WHERE hold_id IN ('hold_12345', 'hold_12346', ...);</div>
+                    </div>
+                    
+                    <div class="analogy-section">
+                        <div class="section-label">🏪 실생활 비유</div>
+                        <p><strong>가계부에 "예약 취소로 인한 재고 증가" 기록</strong><br>
+                        <strong>재고 관리팀에 "진열 수량 업데이트하세요" 알림</strong></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning">
+                <strong>⚠️ T3의 장애 처리:</strong><br>
+                T3는 중간에 실패할 수 있어요. 이때를 대비한 안전장치들:
+                <ul style="margin-top: 10px;">
+                    <li><strong>멱등성 보장:</strong> 원장에 UNIQUE 제약으로 중복 처리 방지</li>
+                    <li><strong>보정 배치:</strong> 주기적으로 재고 일관성 확인 및 자동 수정</li>
+                </ul>
+            </div>
+
+            <div class="success">
+                <strong>🎯 T3 전체 흐름 정리:</strong><br>
+                <span class="highlight">SKIP LOCKED로 T2와의 충돌을 회피</span>하면서 만료된 예약을 안전하게 정리하고 재고를 복원합니다.
+                <div class="code-block">-- 주기적으로 실행 (예: 10초마다)
+WHILE TRUE DO
+  START TRANSACTION;
+  
+  -- 1) 만료된 예약 찾기 → 2) 상태 변경 
+  -- → 3) 재고 복원 → 4) 기록
+  
+  COMMIT;
+  SLEEP 10;  -- 10초 대기
+END WHILE;</div>
+            </div>
+        </div>
+
+        <!-- 상호작용 및 요약 -->
+        <div class="summary-section">
+            <h2>🔄 트랜잭션 간 상호작용</h2>
+            
+            <div class="process-flow">
+                <div class="flow-step" style="background: linear-gradient(45deg, #28a745, #20c997); flex: 2;">
+                    <h3>✅ 정상 흐름</h3>
+                    <p>사용자: 구매 버튼 클릭<br>
+                    ↓ T1: 예약 생성 (재고 100→99)<br>
+                    ↓ 사용자: 결제 진행<br>
+                    ↓ T2: 주문 확정 (HOLD→COMMITTED)<br>
+                    ↓ 완료: 스니커즈 배송</p>
+                </div>
+                
+                <div class="flow-step" style="background: linear-gradient(45deg, #ffc107, #fd7e14); flex: 2;">
+                    <h3>⏰ 만료 흐름</h3>
+                    <p>사용자: 구매 버튼 클릭<br>
+                    ↓ T1: 예약 생성 (재고 100→99)<br>
+                    ↓ 사용자: 결제 안 함 (5분 경과)<br>
+                    ↓ T3: 만료 처리 (재고 99→100)<br>
+                    ↓ 다른 사용자: 구매 가능</p>
+                </div>
+            </div>
+
+            <div class="success">
+                <h3>🎯 핵심 포인트 요약</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 15px;">
+                    <div>
+                        <strong>T1 (예약)의 핵심</strong>
+                        <ul>
+                            <li><strong>조건부 UPDATE:</strong> available >= qty 조건으로 안전한 재고 차감</li>
+                            <li><strong>멱등성:</strong> 같은 요청은 한 번만 처리</li>
+                            <li><strong>원자성:</strong> 6단계가 모두 성공하거나 모두 실패</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>T2 (결제)의 핵심</strong>
+                        <ul>
+                            <li><strong>FOR UPDATE:</strong> 동시 확정 방지</li>
+                            <li><strong>유효성 검사:</strong> 만료/상태 확인</li>
+                            <li><strong>원자성:</strong> 주문 생성과 예약 확정을 함께</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>T3 (정리)의 핵심</strong>
+                        <ul>
+                            <li><strong>SKIP LOCKED:</strong> T2와의 충돌 회피</li>
+                            <li><strong>배치 처리:</strong> 한 번에 적정량만 처리</li>
+                            <li><strong>멱등성:</strong> 여러 번 실행해도 안전</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning">
+                <h3>🛡️ 시스템의 핵심 보장사항</h3>
+                <ul>
+                    <li><strong>절대 초과주문 불가:</strong> 조건부 UPDATE로 101켤레 판매 방지</li>
+                    <li><strong>사용자 경험 우수:</strong> 빠른 예약 → 여유있는 결제</li>
+                    <li><strong>장애 상황 안전:</strong> 멱등성과 보정으로 일관성 유지</li>
+                    <li><strong>고성능:</strong> 3단계 분리로 각각의 책임이 명확</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
